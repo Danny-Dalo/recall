@@ -3,7 +3,17 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import HTMLResponse
 import re
 
-pattern = r"\[(\d+/\d+/\d+), (\d+:\d+:\d+ [AP]M)\] (.*?): (.*)"
+import os
+
+import pgvector, psycopg
+
+
+
+
+database_url = os.getenv("DATABASE_URL")
+
+
+pattern = r"\[(\d+/\d+/\d+), (\d+:\d+:\d+ [AP]M)\] (.*?): (.*?)(?=\n\[|\Z)"
 
 app = FastAPI()
 
@@ -15,19 +25,18 @@ async def upload_file(file : Annotated[UploadFile, File()] = None):
     else:
         read_file = await file.read()
         chat_string = read_file.decode("utf-8") # decode bytes to regular string
+        
 
-        text_blocks = re.findall(pattern, chat_string)
+        text_blocks = re.findall(pattern, chat_string, re.DOTALL)
         # NOTE findall() returns a list of tuples; it is seen as list of lists in response because JSON does not recognize tuples
 
-        chats = []
+        chat = []
         keys = ["date", "time", "sender", "message"]
         for text in text_blocks:
-            chats.append(dict(zip(keys, text)))
+            chat.append(dict(zip(keys, text)))
 
             
-        return chats
-
-
+        return chat
 
 
 
