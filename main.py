@@ -32,11 +32,24 @@ async def upload_file(file : Annotated[UploadFile, File()] = None):
 
         chat = []
         keys = ["date", "time", "sender", "message"]
-        for text in text_blocks:
-            chat.append(dict(zip(keys, text)))
+        for index, text in enumerate(text_blocks, start=1):
+            
+            message_details = dict(zip(keys, text))
+            message_details["message_id"] = index
+            
+            chat.append(
+                message_details
+                )
+
+        chunks = chunk_chat(chat)
+
+        
+      
+
+
 
             
-        return chat
+        return chunks
 
 
 
@@ -53,5 +66,26 @@ def home():
     return HTMLResponse(content=content)
 
 
+
+def chunk_chat(chat):
+
+    messages = (f"\n{data["sender"]}: {data["message"]}" for data in chat)
+    chunks_to_embed = []
+    chunk_info = []
+
+    
+    for chunk_slice in range(0, len(messages), 5):
+        chunks_to_embed.append(messages[chunk_slice: chunk_slice + 5])
+
+    for index, chunk in enumerate(chunks_to_embed, start=1):
+        chunk_info.append({
+            "chunk_id" : index,
+            "messages" : chunk,
+        })
+
+
+
+
+    return chunk_info
 
 
