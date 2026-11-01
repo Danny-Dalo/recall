@@ -69,13 +69,17 @@ def home():
 
 def chunk_chat(chat):
 
-    messages = (f"\n{data["sender"]}: {data["message"]}" for data in chat)
+    messages = tuple([f"\n{data["sender"]}: {data["message"]}" for data in chat])
     chunks_to_embed = []
     chunk_info = []
 
+    chunk_overlap = 2
+    chunk_size = 5
+    step_size = chunk_size - chunk_overlap
     
-    for chunk_slice in range(0, len(messages), 5):
-        chunks_to_embed.append(messages[chunk_slice: chunk_slice + 5])
+    # overlap of 2 for each chunk of 5
+    for chunk_slice in range(0, len(messages), step_size):
+        chunks_to_embed.append(messages[chunk_slice: chunk_slice + chunk_size])
 
     for index, chunk in enumerate(chunks_to_embed, start=1):
         chunk_info.append({
