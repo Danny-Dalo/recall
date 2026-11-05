@@ -1,15 +1,22 @@
 from typing import Annotated
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Cookie, Request
 from fastapi.responses import HTMLResponse
 import re
 
 import os
 
-import pgvector, psycopg
+import psycopg
+from psycopg.rows import dict_row   # tells database to return queries as dictionaries
+from pgvector.psycopg import register_vector
+
+from dotenv import load_dotenv
+from openai import OpenAI
+from pydantic import BaseModel
+
+load_dotenv()
 
 
-
-
+client = OpenAI()
 database_url = os.getenv("DATABASE_URL")
 
 
@@ -19,77 +26,170 @@ app = FastAPI()
 
 
 @app.post("/upload")
-async def upload_file(file : Annotated[UploadFile, File()] = None):
-    if not file:
-        return {"message" : "no file has been uploaded"}
-    else:
+async def upload_file(
+    file : Annotated[UploadFile, File()] = None,
+    session_id : str = Cookie(default=None)):
+
+    with psycopg.connect(database_url, row_factory=dict_row) as conn:
+        workspace_session = conn.execute(f"""
+        SELECT * FROM workspace
+        WHERE session_id = '{session_id}'
+        """).fetchall()
+        
+        print(workspace_session)
+
+        if not workspace_session:
+            return "Session not found"
+        
+
+        if not file:
+            return {"message" : "no file has been uploaded", "session_id" : session_id}
+        
+        conn.execute("""
+                INSERT INTO chat_documents(session_id, filename)
+                VALUES(%s, %s)
+            """, params = (session_id, file.filename,))
+        
         read_file = await file.read()
         chat_string = read_file.decode("utf-8") # decode bytes to regular string
         
-
+        # Returns a list of tuples that match the regex pattern
         text_blocks = re.findall(pattern, chat_string, re.DOTALL)
-        # NOTE findall() returns a list of tuples; it is seen as list of lists in response because JSON does not recognize tuples
+    # #     # NOTE it is seen as list of lists in response because JSON does not recognize tuples
 
-        chat = []
-        keys = ["date", "time", "sender", "message"]
-        for index, text in enumerate(text_blocks, start=1):
+    #     chat = []
+    #     keys = ["date", "time", "sender", "message"]
+    #     for index, text in enumerate(text_blocks):
             
-            message_details = dict(zip(keys, text))
-            message_details["message_id"] = index
+    #         message_details = dict(zip(keys, text))
+    #         message_details["message_id"] = index
             
-            chat.append(
-                message_details
-                )
+    #         chat.append(
+    #             message_details
+    #             )
 
-        chunks = chunk_chat(chat)
+        # chunks_to_embed = chunk_chat(chat)
+        # embed_chunks(chunks_to_embed)
 
         
-      
-
-
-
             
-        return chunks
+        return f"Session for {session_id} for {file.filename}"
 
 
 
+
+import secrets
 @app.get("/")
-def home():
-    content = """
-            <body>
-            <form action="/upload" enctype="multipart/form-data" method="post">
-            <input name=file type="file">
-            <input type="submit">
-            </form>
-            </body>
-        """
-    return HTMLResponse(content=content)
+def home(request : Request) -> HTMLResponse:
 
-
-
-def chunk_chat(chat):
-
-    messages = tuple([f"\n{data["sender"]}: {data["message"]}" for data in chat])
-    chunks_to_embed = []
-    chunk_info = []
-
-    chunk_overlap = 2
-    chunk_size = 5
-    step_size = chunk_size - chunk_overlap
     
-    # overlap of 2 for each chunk of 5
-    for chunk_slice in range(0, len(messages), step_size):
-        chunks_to_embed.append(messages[chunk_slice: chunk_slice + chunk_size])
-
-    for index, chunk in enumerate(chunks_to_embed, start=1):
-        chunk_info.append({
-            "chunk_id" : index,
-            "messages" : chunk,
-        })
+    session_id = request.cookies.get("session_id") # has to match name of the set cookie
+    if not session_id:
+        session_id = secrets.token_urlsafe(32)
 
 
+    content = f"""
+                <body>
+                <form action="/upload" enctype="multipart/form-data" method="post">
+                <input name=file type="file">
+                <input type="submit">
+                </form>
+    
+                <form>
+                <label>search chat:</label>
+                <input type="text">
+                <input type="submit">
+                </form>
+    
+                <p>session id is: {session_id}</p>
+                </body>
+            """
+
+    response = HTMLResponse(content=content)
+    response.set_cookie(
+        key = "session_id",
+        value = session_id,
+        httponly=True
+    )
+
+    with psycopg.connect(database_url, row_factory=dict_row) as conn:
+        conn.execute("""
+        INSERT INTO workspace(session_id)
+        VALUES (%s)
+        ON CONFLICT(session_id)
+        DO NOTHING
+    """, params=(session_id,))
+
+        
+
+    return response
 
 
-    return chunk_info
+
+# def chunk_chat(chat : list[tuple]) -> list[dict]:
+
+#     messages = [f"{data["sender"]}: {data["message"]}" for data in chat]
+#     chunks_to_embed = []
+
+#     chunk_overlap = 2
+#     chunk_size = 5
+#     step_size = chunk_size - chunk_overlap
+
+#     # overlap of 2 for each chunk of 5
+#     for index, chunk_slice in enumerate(range(0, len(messages), step_size)):
+#         chunk = messages[chunk_slice: chunk_slice + chunk_size]
+
+#         chunks_to_embed.append({
+#             "chunk_id": f"chunk {index}",
+#             "messages": chunk,
+#             "message_id_list": list(range(chunk_slice, chunk_slice + len(chunk)))
+#         })
+        
+
+
+
+#     return chunks_to_embed
+
+
+
+# def embed_chunks(chunks_to_embed : list[dict]):
+
+#     if not chunks_to_embed:
+#         return []
+
+#     message_chunks = ["\n".join(chunk["messages"]) for chunk in chunks_to_embed]  # list of strings seperated with the join()
+    
+#     # Create embedding for each list item
+#     response = client.embeddings.create(
+#         model="text-embedding-3-small",
+#         input = message_chunks      
+#     )
+
+#     # response.data returns a list of Embedding objects containing (object='embedding, index=int, embedding=[])
+#     embeddings = sorted(response.data, key=lambda item : item.index)
+
+#     with psycopg.connect(database_url, row_factory=dict_row) as conn:
+#         register_vector(conn)
+        
+#         for chunk, embedding in zip(chunks_to_embed, embeddings):
+#             conn.execute("""
+#                 INSERT INTO message_chunks(chunk_id, message_chunk, embedding)
+#                 VALUES (%s, %s, %s)
+#                 ON CONFLICT(chunk_id) DO NOTHING
+#             """, params = (chunk["chunk_id"], chunk["messages"], embedding.embedding))
+
+
+
+
+
+# def embed_user_search(query):
+#     query_response = client.embeddings.create(
+#         model = "text-embedding-3-small",
+#         input = query
+#     )
+
+#     query_embedding = query_response.data[0].embedding
+
+#     return query_embedding
 
 
