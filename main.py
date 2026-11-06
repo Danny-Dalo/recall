@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse
 import re
 import os
 
+
 import psycopg
 from psycopg.rows import dict_row   # tells database to return queries as dictionaries
 from pgvector.psycopg import register_vector
@@ -41,9 +42,9 @@ def home(request : Request) -> HTMLResponse:
                 <input type="submit">
                 </form>
     
-                <form>
+                <form action = "/search" method="post">
                 <label>search chat:</label>
-                <input type="text">
+                <input type="text" name="query">
                 <input type="submit">
                 </form>
     
@@ -205,8 +206,35 @@ def embed_chunks(document_id, chunks_to_embed : list[dict]):
 
         
 
+# We'll take in submitted html form data
+from fastapi import Form
+@app.post("/search")
+def search_message(
+        query : str | None = Form(media_type="multipart/form-data"),
+        session_id : str = Cookie(default=None)):
+
+    print(query)
+    embedded_query = embed_user_search(query)
+    
+    
+    return {
+        "query" : query,
+        "Session Id" : session_id,
+        "embedded_query" : embedded_query
+    }
 
 
 
 
+
+
+def embed_user_search(query : str):
+    query_response = client.embeddings.create(
+        model = "text-embedding-3-small",
+        input = query
+    )
+
+    embedded_query = query_response.data[0].embedding
+
+    return embedded_query
 
