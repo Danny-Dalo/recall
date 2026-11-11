@@ -3,6 +3,7 @@ from fastapi import FastAPI, UploadFile, File, Cookie, Request
 from fastapi.responses import HTMLResponse
 import re
 import os
+from pydantic import BaseModel
 
 
 import psycopg
@@ -124,37 +125,45 @@ async def upload_file(
         WHERE session_id = '{session_id}'
         """).fetchall()
         
-        print(workspace_session)
 
         if not workspace_session:
             return "Session not found"
-        
 
-        
         
         cursor = conn.execute("""
                 WITH new_document as (
                 INSERT INTO chat_documents(session_id, filename)
                 VALUES(%s, %s)
-                RETURNING id
+                RETURNING id, session_id
                 )
-                SELECT id FROM new_document
-            """, params = (session_id, file.filename,))
-        document_id = cursor.fetchone()["id"]
-        
-
-    chunks_to_embed = chunk_chat(chat)
-    embed_chunks(document_id, chunks_to_embed)
-
-        
-            
-    return document_id
+                SELECT id, session_id FROM new_document
+            """, params = (session_id, file.filename,)).fetchone()
+        db_document_id = cursor["id"]
+        db_session_id = cursor["session_id"]    # same session_id in cookie. accessed through database instead
 
 
 
+    chunks_to_embed = chunk_chat(
+        session_id=db_session_id,
+        document_id=db_document_id, 
+        chat=chat
+        )
+    
+    embed_chunks(chunks_to_embed)
 
 
-def chunk_chat(chat : list[tuple]) -> list[dict]:
+
+
+    return chunks_to_embed
+
+
+
+
+
+
+def chunk_chat(session_id : str, 
+               document_id : int | None = None, 
+               chat : list[tuple] = None) -> list[dict]:
 
     messages = [f"{data["sender"]}: {data["message"]}" for data in chat]
     chunks_to_embed = []
@@ -168,19 +177,20 @@ def chunk_chat(chat : list[tuple]) -> list[dict]:
         chunk = messages[chunk_slice: chunk_slice + chunk_size]
 
         chunks_to_embed.append({
+            "session_id" : session_id,
+            "document_id" : document_id,
             "chunk_id": index,
             "messages": chunk,
             "message_id_list": list(range(chunk_slice, chunk_slice + len(chunk)))
         })
 
 
-
-
     return chunks_to_embed
 
 
 
-def embed_chunks(document_id, chunks_to_embed : list[dict]):
+"""Takes is document id and chunks to be embedded from the upload endpoint"""
+def embed_chunks(chunks_to_embed : list[dict]):
     if not chunks_to_embed:
         return []
 
@@ -200,30 +210,71 @@ def embed_chunks(document_id, chunks_to_embed : list[dict]):
         for chunk, embedding in zip(chunks_to_embed, embeddings):
             
             conn.execute("""
-            INSERT INTO message_chunks(document_id, chunk_id, embeddings)
-            VALUES (%s, %s, %s) 
-        """, params=(document_id, chunk["chunk_id"], embedding.embedding))
+            INSERT INTO message_chunks(document_id, chunk_id, embeddings, messages)
+            VALUES (%s, %s, %s, %s)
+        """, params=(chunk["document_id"], chunk["chunk_id"], embedding.embedding, chunk["messages"]))
 
         
+
+
 
 # We'll take in submitted html form data
 from fastapi import Form
 @app.post("/search")
-def search_message(
+async def search_message(
+        document_id : int,
         query : str | None = Form(media_type="multipart/form-data"),
         session_id : str = Cookie(default=None)):
+    # print(document_id, session_id)
+    print("session_id")
+    print(session_id)
 
-    print(query)
-    embedded_query = embed_user_search(query)
+    with psycopg.connect(database_url, row_factory=dict_row) as conn:
+        # CTEs dont have IDs of their own, we return the referenced table's id for that
+        cursor = conn.execute("""
+            WITH search_document AS (
+            SELECT * FROM chat_documents
+            WHERE session_id = %s
+            AND id = %s
+            )
+
+            SELECT document_id, chunk_id FROM message_chunks
+            WHERE document_id IN (SELECT id FROM search_document)
+            """, params = (session_id,document_id)).fetchall()
+
+        if not cursor:
+            return f"Document does not exist for this session"
+
+
+        cursor = [{key : value for key, value in result.items() if key!="embeddings"} for result in cursor]
+        return cursor
+        
+        # document_ids = conn.execute("""
+        #     SELECT * FROM chat_documents
+        #     WHERE session_id = %s
+        # """, params=(session_id,)).fetchall()
+
+        # chunk_index_list = conn.execute("SELECT document_id, chunk_id FROM message_chunks WHERE document_id = %s", params=(document_id,)).fetchall()
+        # if not chunk_index_list:
+        #     return "Not Found"
+
+
+
+    # embedded_query = embed_user_search(query)
+    # semantic_search(embedded_query, document_id)
+
+    # return {
+    #     "query" : query,
+    #     "session_id" : session_id,
+    #     "chunk_index_list" : [item["chunk_id"] for item in chunk_index_list]
+    # }
     
-    
-    return {
-        "query" : query,
-        "Session Id" : session_id,
-        "embedded_query" : embedded_query
-    }
-
-
+    # return {
+    #     "query" : query,
+    #     "session_id" : session_id,
+    #     # "document_id" : document_ids,
+    #     "embedded_query" : embedded_query
+    # }
 
 
 
@@ -238,3 +289,36 @@ def embed_user_search(query : str):
 
     return embedded_query
 
+
+
+def semantic_search(embedded_query, document_id):
+    
+    
+    with psycopg.connect(database_url) as conn:
+        register_vector(conn)
+
+        # cosine distance range (0 to 2)
+        # cosine similarity range (-1 to 1)
+        results = conn.execute("""
+        WITH similarity_scores AS(
+                SELECT chunk_id, 1 - (%s::vector <=> embeddings) as similarity
+                FROM message_chunks
+                WHERE document_id = %s
+                )
+                SELECT * FROM similarity_scores
+                ORDER by similarity DESC
+                LIMIT 10
+            """, params=(embedded_query, document_id)).fetchall()
+        
+        print(results)
+
+
+
+
+
+
+
+
+
+
+# USE FRONTEND BOYO, MANUALLY TEST WITH THE ID FIRST ON BACKEND
