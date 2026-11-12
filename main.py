@@ -1,34 +1,27 @@
 
-import os
-
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 
+import secrets
 import psycopg
 from psycopg.rows import dict_row   # tells database to return queries as dictionaries
 
 
-from dotenv import load_dotenv
 from openai import OpenAI
-
+from config import settings
 
 from routes import upload, search
 
-
-
-load_dotenv()
 client = OpenAI()
-database_url = os.getenv("DATABASE_URL")
+database_url = settings.database_url
 
 
-pattern = r"\[(\d+/\d+/\d+), (\d+:\d+:\d+ [AP]M)\] (.*?): (.*?)(?=\n\[|\Z)"
 
 app = FastAPI()
 app.include_router(upload.upload_router)
 app.include_router(search.search_router)
 
 
-import secrets
 @app.get("/")
 def home(request : Request) -> HTMLResponse:
 

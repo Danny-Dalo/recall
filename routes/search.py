@@ -1,26 +1,18 @@
 from fastapi import APIRouter
 from fastapi import Cookie, APIRouter, Form
-import os
-
-
 
 
 import psycopg
 from psycopg.rows import dict_row   # tells database to return queries as dictionaries
-from pgvector.psycopg import register_vector
 
 
-from dotenv import load_dotenv
-from openai import OpenAI
+from services.embed import embed_user_search
+from services.search import semantic_search
 
-load_dotenv()
-
-
-database_url = os.getenv("DATABASE_URL")
-client = OpenAI()
+from config import settings
 
 
-
+database_url = settings.database_url
 search_router = APIRouter()
 
 
@@ -48,9 +40,6 @@ async def search_message(
             return f"Document does not exist for this session"
 
 
-        # cursor = [{key : value for key, value in result.items() if key!="embeddings"} for result in cursor]
-        # return cursor
-
 
     
     embedded_query = embed_user_search(query)
@@ -74,41 +63,5 @@ async def search_message(
 
 
 
-def embed_user_search(query : str):
-    query_response = client.embeddings.create(
-        model = "text-embedding-3-small",
-        input = query
-    )
 
-    embedded_query = query_response.data[0].embedding
-
-    return embedded_query
-
-
-
-def semantic_search(embedded_query, document_id):
-    
-    
-    with psycopg.connect(database_url, row_factory=dict_row) as conn:
-        
-        register_vector(conn)
-        
-
-        # cosine distance range (0 to 2).   cosine similarity range (-1 to 1)
-        cursor = conn.execute("""
-        WITH similarity_scores AS(
-                SELECT chunk_id, document_id, messages, 1 - (%s::vector <=> embeddings) as similarity
-                FROM message_chunks
-                WHERE document_id = %s
-                )
-                SELECT * FROM similarity_scores
-                ORDER by similarity DESC
-                LIMIT 10
-            """, params=(embedded_query, document_id)).fetchall()
-
-    
-        
-    return cursor
-
-    
 
