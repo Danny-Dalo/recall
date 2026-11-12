@@ -1,6 +1,6 @@
-
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 import secrets
 import psycopg
@@ -22,6 +22,9 @@ app.include_router(upload.upload_router)
 app.include_router(search.search_router)
 
 
+
+templates = Jinja2Templates(directory="templates")
+
 @app.get("/")
 def home(request : Request) -> HTMLResponse:
 
@@ -31,24 +34,12 @@ def home(request : Request) -> HTMLResponse:
         session_id = secrets.token_urlsafe(32)
 
 
-    content = f"""
-                <body>
-                <form action="/upload" enctype="multipart/form-data" method="post">
-                <input name=file type="file">
-                <input type="submit">
-                </form>
     
-                <form action = "/search" method="post">
-                <label>search chat:</label>
-                <input type="text" name="query">
-                <input type="submit">
-                </form>
+    response = templates.TemplateResponse(
+        request=request,
+        name="main.html"
+    )
     
-                <p>session id is: {session_id}</p>
-                </body>
-            """
-
-    response = HTMLResponse(content=content)
     response.set_cookie(
         key = "session_id",
         value = session_id,
@@ -66,5 +57,3 @@ def home(request : Request) -> HTMLResponse:
         
 
     return response
-
-
