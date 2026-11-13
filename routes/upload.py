@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 
 from typing import Annotated
 
@@ -67,6 +68,11 @@ async def upload_file(
         message_details = dict(zip(keys, text))
         message_details["message_id"] = index
 
+        message_details["date_time"] = datetime.strptime(
+            f"{message_details["date"]} {message_details["time"]}",
+            "%m/%d/%y %I:%M:%S %p"
+        )
+
         chat.append(message_details)
 
     
@@ -103,7 +109,7 @@ async def upload_file(
     embed_chunks(chunks_to_embed)
 
 
-    return chunks_to_embed
+    return chat
 
 
 
