@@ -7,7 +7,7 @@ from psycopg.rows import dict_row   # tells database to return queries as dictio
 
 
 from services.embed import embed_user_search
-from services.search import semantic_search
+from services.search import semantic_search, keyword_search
 
 from config import settings
 
@@ -47,6 +47,8 @@ async def search_message(
 
     
     semantic_search_results = semantic_search(embedded_query, document_id)
+    keyword_search_results = keyword_search(query=query, document_id=document_id)
+
     search_details = {
         "query" : query,
         "session_id" : session_id,
@@ -55,7 +57,7 @@ async def search_message(
 
     search_results = [{**search_details, **result} for result in semantic_search_results]
 
-    return search_results
+    return (semantic_search_results,{}, {}, {}, {}, keyword_search_results)
 
 
 

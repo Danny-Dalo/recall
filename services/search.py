@@ -19,7 +19,7 @@ def semantic_search(embedded_query, document_id):
         # cosine distance range (0 to 2).   cosine similarity range (-1 to 1)
         cursor = conn.execute("""
         WITH similarity_scores AS(
-                SELECT chunk_id, document_id, messages, 1 - (%s::vector <=> embeddings) as similarity
+                SELECT document_id, chunk_id, messages, 1 - (%s::vector <=> embeddings) as similarity
                 FROM message_chunks
                 WHERE document_id = %s
                 )
@@ -31,6 +31,29 @@ def semantic_search(embedded_query, document_id):
     
         
     return cursor
+
+
+def keyword_search(query, document_id):
+    with psycopg.connect(database_url, row_factory=dict_row) as conn:
+        # register_vector(register_vector)
+
+        cursor = conn.execute("""
+            SELECT document_id, chunk_id, messages, ts_rank(
+                messages_vector, tsquery
+            ) AS keyword_score
+
+            FROM message_chunks, websearch_to_tsquery('english', replace(%s, ' ', ' OR ')) AS tsquery
+
+            WHERE document_id = %s
+            AND tsquery @@ messages_vector
+
+            ORDER BY keyword_score DESC
+            LIMIT 10
+            """, params=(query, document_id)).fetchall()
+
+
+    return cursor
+
 
     
 
