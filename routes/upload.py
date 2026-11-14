@@ -98,6 +98,20 @@ async def upload_file(
         db_document_id = cursor["id"]
         db_session_id = cursor["session_id"]    # same session_id in cookie. accessed through database instead
 
+        for chat_message in chat:
+            conn.execute("""
+            INSERT INTO chat_messages(
+            document_id, message_id,
+            date_time, sender, message)
+            VALUES (%s, %s, %s, %s, %s)
+            """, params = (
+                db_document_id,
+                chat_message["message_id"],
+                chat_message["date_time"],
+                chat_message["sender"],
+                chat_message["message"]
+            ))
+
 
 
     chunks_to_embed = chunk_chat(
