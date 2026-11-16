@@ -8,7 +8,7 @@ from config import settings
 database_url = settings.database_url
 
 
-def semantic_search(embedded_query, document_id):
+def semantic_search(embedded_query, document_id) -> list[dict]:
     
     
     with psycopg.connect(database_url, row_factory=dict_row) as conn:
@@ -33,12 +33,12 @@ def semantic_search(embedded_query, document_id):
     return cursor
 
 
-def keyword_search(query, document_id):
+def keyword_search(query, document_id) -> list[dict]:
     with psycopg.connect(database_url, row_factory=dict_row) as conn:
         # register_vector(register_vector)
 
         cursor = conn.execute("""
-            SELECT document_id, chunk_id, messages, ts_rank(
+            SELECT document_id, chunk_id, messages, ts_rank_cd(
                 messages_vector, tsquery
             ) AS keyword_score
 
@@ -55,5 +55,5 @@ def keyword_search(query, document_id):
     return cursor
 
 
-    
+
 
