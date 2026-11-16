@@ -6,8 +6,7 @@ import psycopg
 from psycopg.rows import dict_row   # tells database to return queries as dictionaries
 
 
-from services.embed import embed_user_search
-from services.search import semantic_search, keyword_search
+from services.search import hybrid_search
 
 from config import settings
 
@@ -42,12 +41,6 @@ async def search_message(
 
 
     
-    embedded_query = embed_user_search(query)
-    
-
-    
-    semantic_search_results = semantic_search(embedded_query, document_id)
-    keyword_search_results = keyword_search(query=query, document_id=document_id)
 
     search_details = {
         "query" : query,
@@ -55,9 +48,11 @@ async def search_message(
         "document_id" : document_id
     }
 
-    search_results = [{**search_details, **result} for result in semantic_search_results]
+    hybrid_search_results = hybrid_search(query, document_id)
 
-    return (semantic_search_results,{}, {}, {}, {}, keyword_search_results)
+    search_results = [{**search_details, **result} for result in hybrid_search_results]
+
+    return search_results
 
 
 
