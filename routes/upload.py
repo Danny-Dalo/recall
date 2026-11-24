@@ -39,29 +39,28 @@ async def upload_file(
             detail="No file uploaded"
         )
     if not file.filename.endswith(".txt"):
-        return {
-            "error" : "Invalid file type",
-            "message" : "only .txt files accepted"
-        }
+        raise HTTPException(
+            status_code=415,
+            detail="Invalid file type"
+        )
 
     try:
         read_file = await file.read()
         chat_string = read_file.decode("utf-8") # decode bytes to regular string
     except UnicodeDecodeError:
-        return {
-            "error" : "Couldn't read file",
-            "message" : "The uploaded document does not appear to be a valid WhatsApp chat export."
-        }
-    
+        raise HTTPException(
+            status_code=422,
+            detail="Couldn't read file. Make sure to upload a valid WhatsApp chat export."
+        )
     
     
     # Returns a list of tuples that match the regex pattern
     text_blocks = re.findall(chat_pattern, chat_string, re.DOTALL)
     if not text_blocks:
-        return {
-            "error" : "Invalid File",
-            "message": "The uploaded document does not appear to be a valid WhatsApp chat export."
-        }
+        raise HTTPException(
+                    status_code=422,
+                    detail="Couldn't read file. Make sure to upload a valid WhatsApp chat export."
+        )
     # NOTE it is seen as list of lists in response because JSON does not recognize tuples
 
 
