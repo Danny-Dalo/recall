@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import UploadFile, File
+from fastapi import HTTPException, status
 from fastapi import Cookie, APIRouter
 
 import psycopg
@@ -33,7 +34,10 @@ async def upload_file(
     session_id : str = Cookie(default=None)):
 
     if not file:
-        return {"message" : "no file has been uploaded", "session_id" : session_id}
+        raise HTTPException(
+            status_code=404,
+            detail="No file uploaded"
+        )
     if not file.filename.endswith(".txt"):
         return {
             "error" : "Invalid file type",

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
 import secrets
 import psycopg
@@ -18,6 +19,9 @@ database_url = settings.database_url
 
 
 app = FastAPI()
+
+app.mount(path="/static", app=StaticFiles(directory="static"), name="static")
+
 app.include_router(upload.upload_router)
 app.include_router(search.search_router)
 
@@ -30,6 +34,8 @@ def home(request : Request) -> HTMLResponse:
 
     
     session_id = request.cookies.get("session_id") # has to match name of the set cookie
+
+
     if not session_id:
         session_id = secrets.token_urlsafe(32)
 
@@ -54,6 +60,8 @@ def home(request : Request) -> HTMLResponse:
         DO NOTHING
     """, params=(session_id,))
 
-        
 
     return response
+
+
+

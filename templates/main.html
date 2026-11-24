@@ -4,19 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
 </head>
 <body>
-    <form action="/upload" enctype="multipart/form-data" method="post">
-        <input name=file type="file">
-        <input type="submit">
+    <form id="upload-form">
+        <input name=file type="file" id="file-input">
+        <button type="submit">Submit</button>
     </form>
+    <div><p id="status"></p></div>
     
     <form action = "/search" method="post">
         <label>search chat:</label>
         <input type="text" name="query">
         <input type="submit">
     </form>
+      
+    <div class="uploaded_documents">
+        <p></p>
+    </div>
+
     
-    
+
 </html>
+
+<script src="{{ url_for('static', path='/js/main.js') }}"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
