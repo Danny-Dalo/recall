@@ -12,3 +12,5 @@ wheels/
 
 test.py
 test.js
+
+node_modules/
