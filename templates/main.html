@@ -18,7 +18,7 @@
         <section class="rounded-2xl border border-[#dce7df] bg-white p-4 shadow-sm sm:p-5" aria-label="Upload chat">
             <form id="upload-form" class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <input name="file" type="file" id="file-input" class="min-w-0 flex-1 rounded-lg border border-[#dce7df] bg-white px-3 py-2 text-sm text-[#526158] file:mr-3 file:rounded-md file:border-0 file:bg-[#e8f5ed] file:px-3 file:py-1.5 file:font-medium file:text-[#147a55]">
-                <button type="submit" class="rounded-lg bg-[#16856b] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#116d57] focus:outline-none focus:ring-2 focus:ring-[#16856b] focus:ring-offset-2">Upload chat</button>
+                <button type="submit" class="rounded-lg bg-[#16856b] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#116d57] focus:outline-none focus:ring-2 focus:ring-[#16856b] focus:ring-offset-2" id="upload-btn">Upload chat</button>
             </form>
             <p id="status" class="mt-3 text-sm text-[#68766e]" role="status" aria-live="polite"></p>
         </section>
@@ -31,6 +31,8 @@
                 <p id="chat-empty" class="m-auto max-w-xs text-center text-sm leading-6 text-[#78867d]">Your uploaded chat will appear here.</p>
             </div>
         </section>
+
+        <div id="uploaded-documents"></div>
     </main>
     <script src="{{ url_for('static', path='/js/main.js') }}"></script>
 </body>

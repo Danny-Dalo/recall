@@ -3,9 +3,15 @@ const BASE_URL = "http://127.0.0.1:8000"
 const eventStatus = document.querySelector("#status")
 eventStatus.classList.add("hidden")
 
+
+
+const uploadForm = document.querySelector('#upload-form')
+const uploadBtn = document.querySelector('#upload-btn')
+const uploadedDocuments = document.querySelector('#uploaded-documents')
 async function uploadFile(event) {
         event.preventDefault()
     try {
+        uploadBtn.disabled = true
         eventStatus.classList.remove("hidden")
         eventStatus.textContent = "Uploading please wait..."
 
@@ -25,6 +31,7 @@ async function uploadFile(event) {
             method : "POST",
             body : formData
         })
+        uploadForm.reset()
         
         const data = await response.json()
         if(!response.ok){
@@ -38,17 +45,26 @@ async function uploadFile(event) {
             eventStatus.classList.add("hidden")
             }, 6000);
 
+        if(data.success === true){
+            const documentParagraph = document.createElement('p')
+            documentParagraph.textContent = data.document_id
+            uploadedDocuments.appendChild(documentParagraph)
+        }
+
         console.log(data)
-        loadMessages(data)
+        loadMessages(data.chat)
         return data
     } catch (error) {
         eventStatus.textContent = `Error: ${error.message}`
         throw error
     }
+    finally {
+        
+        uploadBtn.disabled = false
+    }
 }
 
 
-const uploadForm = document.querySelector('#upload-form')
 uploadForm.addEventListener('submit', uploadFile)
 
 
@@ -110,7 +126,6 @@ async function loadMessages(messages) {
     chatMessages.append(fragment)
     chatMessages.scrollTop = chatMessages.scrollHeight
 }
-
 
 
 
